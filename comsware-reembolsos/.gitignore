@@ -1,9 +1,15 @@
-bin/
-obj/
-.vs/
-*.user
-*.suo
-appsettings.*.local.json
-node_modules/
-.dart_tool/
-.idea/
+# .NET 
+**/bin/ 
+**/obj/ 
+# Flutter 
+mobile/.dart_tool/ 
+mobile/build/ 
+# Angular 
+web/node_modules/ 
+web/dist/ 
+web/.angular/ 
+# Editor y secretos 
+.vscode/ 
+.idea/ 
+.env 
+**/appsettings.Development.local.json 
