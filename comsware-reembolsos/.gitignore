@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+appsettings.*.local.json
+node_modules/
+.dart_tool/
+.idea/

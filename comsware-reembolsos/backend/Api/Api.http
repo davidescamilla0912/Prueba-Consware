@@ -1,0 +1,30 @@
+@Api_HostAddress = http://localhost:5000
+
+POST {{Api_HostAddress}}/api/reimbursements
+Content-Type: application/json
+
+{
+  "employeeName": "Ana Pérez",
+  "amount": 500000,
+  "category": "Transporte",
+  "description": "Taxi auto-aprobado"
+}
+
+###
+
+POST {{Api_HostAddress}}/api/reimbursements
+Content-Type: application/json
+
+{
+  "employeeName": "Ana Pérez",
+  "amount": 500001,
+  "category": "Hospedaje",
+  "description": "Hotel pendiente"
+}
+
+###
+
+PATCH {{Api_HostAddress}}/api/reimbursements/2/reject
+Content-Type: application/json
+
+{}
