@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Necesaria para que la app hable con la API local (guía §8.3). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="mobile"
+        android:label="Reembolsos Consware"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
