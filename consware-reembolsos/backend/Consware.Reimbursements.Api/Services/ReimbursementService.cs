@@ -1,68 +1,138 @@
+using Consware.Reimbursements.Api.Data;
+using Consware.Reimbursements.Api.DTOs;
+using Consware.Reimbursements.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace Api;
+namespace Consware.Reimbursements.Api.Services;
 
-public record CreateDto(string? EmployeeName, decimal Amount, string? Category, string? Description);
-public record RejectDto(string? Reason);
-
-public class ReimbursementService(AppDbContext db)
+public class ReimbursementService(AppDbContext db) : IReimbursementService
 {
-    public async Task<ReimbursementRequest> CreateAsync(CreateDto d)
+    /// <summary>Umbral central: 500.000 COP exactos se aprueba; 500.000,01 queda pendiente.</summary>
+    private const decimal AutoApproveLimit = 500000m;
+
+    public async Task<ReimbursementResponseDto> CreateAsync(CreateReimbursementDto dto)
     {
-        if (d.Amount <= 0) throw new ArgumentException("El monto debe ser mayor que 0.");
-        if (string.IsNullOrWhiteSpace(d.Category)) throw new ArgumentException("La categoría es obligatoria.");
-        if (string.IsNullOrWhiteSpace(d.Description)) throw new ArgumentException("La descripción es obligatoria.");
+        if (string.IsNullOrWhiteSpace(dto.EmployeeName))
+            throw new ArgumentException("El nombre del empleado es obligatorio.");
+        if (dto.EmployeeName.Trim().Length > 100)
+            throw new ArgumentException("El nombre del empleado no puede superar 100 caracteres.");
+        if (dto.Amount <= 0)
+            throw new ArgumentException("El monto debe ser mayor a cero.");
+        if (string.IsNullOrWhiteSpace(dto.Category))
+            throw new ArgumentException("La categoría es obligatoria.");
+        if (dto.Category.Trim().Length > 60)
+            throw new ArgumentException("La categoría no puede superar 60 caracteres.");
+        if (string.IsNullOrWhiteSpace(dto.Description))
+            throw new ArgumentException("La descripción es obligatoria.");
+        if (dto.Description.Trim().Length > 500)
+            throw new ArgumentException("La descripción no puede superar 500 caracteres.");
 
         var now = DateTime.UtcNow;
-        var auto = d.Amount <= 500000m;
-        var r = new ReimbursementRequest
+        var autoApproved = dto.Amount <= AutoApproveLimit;
+
+        var request = new ReimbursementRequest
         {
-            EmployeeName = string.IsNullOrWhiteSpace(d.EmployeeName) ? "Empleado Demo" : d.EmployeeName.Trim(),
-            Amount = d.Amount,
-            Category = d.Category.Trim(),
-            Description = d.Description.Trim(),
-            Status = auto ? ReimbursementStatus.Approved : ReimbursementStatus.Pending,
+            EmployeeName = dto.EmployeeName.Trim(),
+            Amount = dto.Amount,
+            Category = dto.Category.Trim(),
+            Description = dto.Description.Trim(),
+            Status = autoApproved ? ReimbursementStatus.Approved : ReimbursementStatus.Pending,
             CreatedAtUtc = now,
-            DecidedAtUtc = auto ? now : null
+            DecidedAtUtc = autoApproved ? now : null
         };
-        db.Add(r);
+
+        db.ReimbursementRequests.Add(request);
         await db.SaveChangesAsync();
-        return r;
+
+        return ToResponse(request);
     }
 
-    public Task<List<ReimbursementRequest>> ListAsync(ReimbursementStatus? status, string? employee)
+    public async Task<List<ReimbursementResponseDto>> GetAllAsync(string? status, string? employeeName)
     {
-        var q = db.ReimbursementRequests.AsNoTracking().AsQueryable();
-        if (status != null) q = q.Where(x => x.Status == status);
-        if (!string.IsNullOrWhiteSpace(employee)) q = q.Where(x => x.EmployeeName == employee);
-        return q.OrderByDescending(x => x.CreatedAtUtc).ToListAsync();
+        var query = db.ReimbursementRequests.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!TryParseStatus(status, out var parsed))
+                throw new ArgumentException("Filtro de estado desconocido. Use Pending, Approved o Rejected.");
+
+            query = query.Where(x => x.Status == parsed);
+        }
+
+        if (!string.IsNullOrWhiteSpace(employeeName))
+            query = query.Where(x => x.EmployeeName == employeeName);
+
+        var items = await query.OrderByDescending(x => x.CreatedAtUtc).ToListAsync();
+
+        return items.Select(ToResponse).ToList();
     }
 
-    public async Task<ReimbursementRequest> GetAsync(int id) =>
-        await db.ReimbursementRequests.FindAsync(id)
-        ?? throw new KeyNotFoundException("Solicitud no encontrada.");
+    public async Task<ReimbursementResponseDto?> GetByIdAsync(int id) =>
+        ToResponseOrNull(await db.ReimbursementRequests.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id));
 
-    public async Task<ReimbursementRequest> ApproveAsync(int id)
+    public async Task<ReimbursementResponseDto> ApproveAsync(int id)
     {
-        var r = await GetAsync(id);
-        if (r.Status != ReimbursementStatus.Pending)
-            throw new InvalidOperationException("La solicitud ya fue decidida.");
-        r.Status = ReimbursementStatus.Approved;
-        r.DecidedAtUtc = DateTime.UtcNow;
+        var request = await db.ReimbursementRequests.FindAsync(id)
+            ?? throw new KeyNotFoundException("Solicitud no encontrada.");
+
+        if (request.Status != ReimbursementStatus.Pending)
+            throw new InvalidOperationException("La solicitud ya fue decidida y no puede cambiar de estado.");
+
+        request.Status = ReimbursementStatus.Approved;
+        request.DecidedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync();
-        return r;
+
+        return ToResponse(request);
     }
 
-    public async Task<ReimbursementRequest> RejectAsync(int id, string? reason)
+    public async Task<ReimbursementResponseDto> RejectAsync(int id, string? reason)
     {
-        if (string.IsNullOrWhiteSpace(reason)) throw new ArgumentException("El motivo es obligatorio.");
-        var r = await GetAsync(id);
-        if (r.Status != ReimbursementStatus.Pending)
-            throw new InvalidOperationException("La solicitud ya fue decidida.");
-        r.Status = ReimbursementStatus.Rejected;
-        r.RejectionReason = reason.Trim();
-        r.DecidedAtUtc = DateTime.UtcNow;
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("El motivo del rechazo es obligatorio.");
+        if (reason.Trim().Length > 500)
+            throw new ArgumentException("El motivo del rechazo no puede superar 500 caracteres.");
+
+        var request = await db.ReimbursementRequests.FindAsync(id)
+            ?? throw new KeyNotFoundException("Solicitud no encontrada.");
+
+        if (request.Status != ReimbursementStatus.Pending)
+            throw new InvalidOperationException("La solicitud ya fue decidida y no puede cambiar de estado.");
+
+        request.Status = ReimbursementStatus.Rejected;
+        request.RejectionReason = reason.Trim();
+        request.DecidedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync();
-        return r;
+
+        return ToResponse(request);
     }
+
+    private static bool TryParseStatus(string value, out ReimbursementStatus status)
+    {
+        foreach (var name in Enum.GetNames<ReimbursementStatus>())
+        {
+            if (string.Equals(name, value, StringComparison.OrdinalIgnoreCase))
+            {
+                status = Enum.Parse<ReimbursementStatus>(name);
+                return true;
+            }
+        }
+
+        status = default;
+        return false;
+    }
+
+    private static ReimbursementResponseDto ToResponse(ReimbursementRequest request) => new(
+        request.Id,
+        request.EmployeeName,
+        request.Amount,
+        request.Category,
+        request.Description,
+        request.Status.ToString(),
+        request.RejectionReason,
+        request.CreatedAtUtc,
+        request.DecidedAtUtc);
+
+    private static ReimbursementResponseDto? ToResponseOrNull(ReimbursementRequest? request) =>
+        request is null ? null : ToResponse(request);
 }

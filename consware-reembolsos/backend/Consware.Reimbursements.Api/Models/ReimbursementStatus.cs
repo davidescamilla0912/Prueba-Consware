@@ -1,3 +1,9 @@
-namespace Api;
+namespace Consware.Reimbursements.Api.Models;
 
-public enum ReimbursementStatus { Pending, Approved, Rejected }
+/// <summary>Estados de una solicitud. Nunca regresan de Pending a un estado final.</summary>
+public enum ReimbursementStatus
+{
+    Pending,
+    Approved,
+    Rejected
+}

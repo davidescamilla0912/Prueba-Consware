@@ -1,14 +1,23 @@
-namespace Api;
+namespace Consware.Reimbursements.Api.Models;
 
+/// <summary>Entidad persistida en SQL Server (tabla dbo.ReimbursementRequests).</summary>
 public class ReimbursementRequest
 {
     public int Id { get; set; }
-    public string EmployeeName { get; set; } = "Empleado Demo";
+
+    public string EmployeeName { get; set; } = string.Empty;
+
     public decimal Amount { get; set; }
-    public string Category { get; set; } = "";
-    public string Description { get; set; } = "";
+
+    public string Category { get; set; } = string.Empty;
+
+    public string Description { get; set; } = string.Empty;
+
     public ReimbursementStatus Status { get; set; }
+
     public string? RejectionReason { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
+
     public DateTime? DecidedAtUtc { get; set; }
 }

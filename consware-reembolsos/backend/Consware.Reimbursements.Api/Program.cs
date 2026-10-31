@@ -1,14 +1,23 @@
-using Api;
+using Consware.Reimbursements.Api.Data;
+using Consware.Reimbursements.Api.Services;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json.Serialization;
 
-var b = WebApplication.CreateBuilder(args);
-b.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(b.Configuration.GetConnectionString("Default")));
-b.Services.AddScoped<ReimbursementService>();
-b.Services.AddControllers().AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-b.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+var builder = WebApplication.CreateBuilder(args);
 
-var app = b.Build();
-app.UseCors();
+builder.Services.AddControllers();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<IReimbursementService, ReimbursementService>();
+
+// Angular (navegador) necesita el origen declarado; Flutter no depende de CORS.
+builder.Services.AddCors(options =>
+    options.AddPolicy("AngularLocal", policy =>
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod()));
+
+var app = builder.Build();
+
+app.UseCors("AngularLocal");
 app.MapControllers();
 app.Run();

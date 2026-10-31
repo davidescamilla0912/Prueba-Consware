@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Api.Migrations
+namespace Consware.Reimbursements.Api.Migrations
 {
     /// <inheritdoc />
-    public partial class Initial : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -18,10 +18,10 @@ namespace Api.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     EmployeeName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    Amount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     Category = table.Column<string>(type: "nvarchar(60)", maxLength: 60, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
+                    Status = table.Column<string>(type: "varchar(16)", unicode: false, maxLength: 16, nullable: false),
                     RejectionReason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
                     DecidedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true)
@@ -29,7 +29,20 @@ namespace Api.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ReimbursementRequests", x => x.Id);
+                    table.CheckConstraint("CK_Reimbursements_Amount", "[Amount] > 0");
+                    table.CheckConstraint("CK_Reimbursements_RejectionReason", "[Status] <> 'Rejected' OR ([RejectionReason] IS NOT NULL AND LEN(LTRIM(RTRIM([RejectionReason]))) > 0)");
+                    table.CheckConstraint("CK_Reimbursements_Status", "[Status] IN ('Pending','Approved','Rejected')");
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ReimbursementRequests_EmployeeName",
+                table: "ReimbursementRequests",
+                column: "EmployeeName");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ReimbursementRequests_Status",
+                table: "ReimbursementRequests",
+                column: "Status");
         }
 
         /// <inheritdoc />
