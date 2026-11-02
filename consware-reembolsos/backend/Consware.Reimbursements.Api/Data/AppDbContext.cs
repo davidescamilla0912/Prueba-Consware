@@ -1,5 +1,6 @@
 using Consware.Reimbursements.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Consware.Reimbursements.Api.Data;
 
@@ -26,8 +27,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasMaxLength(16)
             .IsUnicode(false);
 
-        entity.Property(x => x.CreatedAtUtc).HasColumnType("datetime2");
-        entity.Property(x => x.DecidedAtUtc).HasColumnType("datetime2");
+        // datetime2 se materializa con Kind=Unspecified: System.Text.Json entonces
+        // serializa sin 'Z' y Flutter lo interpreta como hora local (5 h de desfase
+        // en Colombia). El convertidor sólo fija Kind=Utc en la lectura; no cambia
+        // el valor ni el tipo de columna, así que no requiere migración.
+        var utc = new ValueConverter<DateTime, DateTime>(
+            v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+        var utcNullable = new ValueConverter<DateTime?, DateTime?>(
+            v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
+
+        entity.Property(x => x.CreatedAtUtc).HasColumnType("datetime2").HasConversion(utc);
+        entity.Property(x => x.DecidedAtUtc).HasColumnType("datetime2").HasConversion(utcNullable);
 
         // Defensa en base de datos (la validación sigue viva en el servicio).
         entity.ToTable("ReimbursementRequests", t =>
