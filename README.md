@@ -80,13 +80,13 @@ flutter run
 ```
 cd consware-reembolsos/web
 npm install
-npm start          # http://localhost:4200
+npm start          # http://localhost:4200 (o el siguiente libre si está ocupado)
 npm test           # 10 tests unitarios (Vitest)
 npm run build      # build de producción
 ```
 
 - El panel arranca filtrando por **Pendientes**; se puede cambiar a Todos, Aprobadas o Rechazadas y buscar por empleado.
-- CORS: la API declara el origen `http://localhost:4200` en la policy `AngularLocal` (`Program.cs`). Si el panel corre en otro puerto, hay que añadirlo a `WithOrigins`.
+- CORS: la policy `AngularLocal` (`Program.cs`) acepta **cualquier puerto** de `localhost` o `127.0.0.1`. En desarrollo `ng serve` cambia de puerto si el 4200 está ocupado (p. ej. `http://localhost:49718`), y el panel sigue funcionando sin tocar el backend. Fuera de localhost no se autoriza ningún origen.
 - Si la API está apagada, el panel muestra un mensaje con la dirección a revisar en lugar de fallar en blanco.
 
 ## 8. Rutas HTTP y reglas de negocio
@@ -133,7 +133,7 @@ Resultado: **Total 18 | PASS 18 | FAIL 0** (código de salida 0).
 - `npm run build` sin errores.
 - `npm test`: **10/10 PASS** — carga inicial con filtro `Pending`, filtro `Todos` sin parámetro `status`, búsqueda por empleado, bloqueo del motivo vacío en la UI sin llamar a la API (T19), `PATCH reject` con el motivo correcto, confirmación antes de aprobar, mensaje claro con la API apagada y manejo del 409 recargando la tabla.
 - Render real con Chrome headless sobre `http://localhost:4200`: tabla con 5 pendientes, chips de filtro, sin banner de error.
-- CORS verificado con `Origin: http://localhost:4200` en `OPTIONS`/`GET`/`PATCH` (`Access-Control-Allow-Origin: http://localhost:4200`).
+- CORS verificado con `Origin: http://localhost:4200` y `http://localhost:49718` en `OPTIONS`/`GET`/`PATCH` (`Access-Control-Allow-Origin` devuelve el origen pedido); `http://evil.example.com` queda sin `Access-Control-Allow-Origin`.
 
 **Persistencia tras reiniciar la API:** los registros seguían disponibles después de detener y volver a levantar el backend.
 
