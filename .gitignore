@@ -1,3 +1,0 @@
-# Artefacto de un `npm install` ejecutado en la raíz (no hay package.json aquí).
-# El lockfile real del proyecto es consware-reembolsos/web/package-lock.json.
-/package-lock.json
